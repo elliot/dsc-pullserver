@@ -27,13 +27,13 @@ function DownloadAndExtract
     $Client.DownloadFile($Source, $Temp)
 
     if (!(Test-Path $Temp)) {
-        Write-Host "Failed to download file ($Source)"
+        Write-Host -ForegroundColor Red "Failed to download file ($Source)"
         exit
     }
 
     if ((Get-FileHash $Temp -Algorithm SHA1).Hash -ne $Checksum) {
         Remove-Item $Temp
-        Write-Host "File integrity check failed ($Source)"
+        Write-Host -ForegroundColor Red "File integrity check failed ($Source)"
         exit
     }
 
@@ -59,22 +59,30 @@ Add-WindowsFeature Dsc-Service -IncludeManagementTools
 # Enable WS Management listener
 Enable-PSRemoting -Force
 
+$PSModules = "$env:ProgramFiles\WindowsPowerShell\Modules"
+
 $Modules = @(
     @{
-        File = 'https://gallery.technet.microsoft.com/xPSDesiredStateConfiguratio-417dc71d/file/131370/1/xPSDesiredStateConfiguration_3.0.3.4.zip';
-        Hash = '73B9131D46AFBC864272CA425069EFB5EA1D4813';
-    }
-    @{
-        File = 'https://gallery.technet.microsoft.com/xExchange-PowerShell-1dd18388/file/131350/2/xExchange_1.0.3.11.zip'
-        Hash = 'B0048399CEA6A9304DFA94B48AB1185AE0E00B51';
+        File = 'https://gallery.technet.microsoft.com/scriptcenter/DSC-Resource-Kit-All-c449312d/file/131371/2/DSC%20Resource%20Kit%20Wave%2010%2002182015.zip'
+        Hash = '63F68C163C2B526A7A7429296C8EE0C502C3D38B';
     }
 )
 
 $Modules | % {
     Write-Host "Downloading module $($_.File)"
 
-    DownloadAndExtract -Source $_.File -Target "$env:ProgramFiles\WindowsPowerShell\Modules" -Checksum $_.Hash
+    DownloadAndExtract -Source $_.File -Target $PSModules -Checksum $_.Hash
 }
+
+# Fix the Resource Kit
+Get-ChildItem "$PSModules\All Resources" | % {
+    Move-Item $_.FullName $_.Parent.Parent.FullName
+}
+
+Remove-Item -Force "$PSModules\All Resources"
+
+# Force a module cache reload
+Get-DscResource | Out-Null
 
 . .\Config.ps1
 
